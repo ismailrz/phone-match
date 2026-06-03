@@ -630,11 +630,22 @@ document.querySelectorAll('.tab').forEach(tab => {
   });
 });
 
+// ── XSS-safe HTML escaping ─────────────────────────────────────────────────
+function escapeHtml(s) {
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
 // ── Compare tag input ──────────────────────────────────────────────────────
 const comparePhones = [];
 const compareInput = document.getElementById('compare-input');
 compareInput.addEventListener('keydown', e => {
   if (e.key === 'Enter') addComparePhone();
+});
+
+// Event delegation for tag remove buttons — avoids inline onclick with user data
+document.getElementById('compare-tags').addEventListener('click', e => {
+  const btn = e.target.closest('[data-remove]');
+  if (btn) removeComparePhone(btn.dataset.remove);
 });
 
 function addComparePhone() {
@@ -655,8 +666,8 @@ function renderCompareTags() {
   const el = document.getElementById('compare-tags');
   el.innerHTML = comparePhones.map(p => `
     <div class="tag">
-      ${p}
-      <span class="tag-remove" onclick="removeComparePhone('${p.replace(/'/g,"\\'")}')">×</span>
+      ${escapeHtml(p)}
+      <span class="tag-remove" data-remove="${escapeHtml(p)}">×</span>
     </div>
   `).join('');
 }
@@ -703,6 +714,16 @@ async function post(path, body) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
+  // Graceful fallback for /phone-details using search
+  if (res.status === 404 && path === '/phone-details') {
+    const searchRes = await fetch('/phones/search?model=' + encodeURIComponent(body.phone));
+    if (searchRes.ok) {
+      const data = await searchRes.json();
+      const phones = data.phones || [];
+      if (phones.length) return buildDetailFromSearch(phones[0]);
+    }
+    throw new Error('Phone not found');
+  }
   if (!res.ok) {
     const err = await res.json().catch(() => ({ message: res.statusText }));
     throw new Error(err.error || err.message || 'Request failed');
@@ -769,7 +790,8 @@ async function doRecommend() {
     const recs = data.recommendations || data;
 
     if (!recs.length) {
-      container.innerHTML = `<div class="empty-state"><div class="icon">😔</div><p>No phones found. Try a different query or relax your budget.</p></div>`;
+      const q = document.getElementById('rec-input').value.trim();
+      container.innerHTML = `<div class="empty-state"><div class="icon">🤔</div><p>I couldn't find any phones matching "<strong>${escapeHtml(q)}</strong>".<br>Try asking about phones — e.g. "best camera phone under $800".</p></div>`;
       return;
     }
 
@@ -798,16 +820,16 @@ function renderRecCard(r) {
   <div class="phone-card" onclick="showDetail('${encodeURIComponent(name)}')">
     <div class="card-header">
       <div class="rank-badge ${rankBadgeClass(r.rank)}">${r.rank}</div>
-      <div class="phone-name">${name}</div>
-      <div class="phone-price">${price}</div>
+      <div class="phone-name">${escapeHtml(name)}</div>
+      <div class="phone-price">${escapeHtml(price)}</div>
     </div>
     <div class="score-ring">
       <div>
         <div class="big-score">${r.score ?? r.finalScore}</div>
-        <div class="score-label">${os}</div>
+        <div class="score-label">${escapeHtml(os)}</div>
       </div>
     </div>
-    <div class="explanation">${r.explanation}</div>
+    <div class="explanation">${escapeHtml(r.explanation)}</div>
     <div class="score-bars">${renderScoreBars(s)}</div>
     <div class="spec-chips">${renderChips(r)}</div>
   </div>`;
@@ -888,7 +910,7 @@ function renderComparison(data) {
     <div class="winner-banner">
       <div class="crown">👑</div>
       <div>
-        <strong>${winnerName}</strong>
+        <strong>${escapeHtml(winnerName)}</strong>
         <p>Wins with the highest balanced score across all 7 dimensions</p>
       </div>
     </div>
@@ -947,10 +969,10 @@ function renderPhoneListItem(p) {
   return `
     <div class="phone-list-item" onclick="showDetail('${encodeURIComponent(name)}')">
       <div class="phone-list-info">
-        <div class="phone-list-name">${name}</div>
-        <div class="phone-list-meta">${p.price || ('$'+(p.priceUsd||''))} · ${p.chipset || ''} · ${p.ram || ''} RAM · ${p.battery || ''}</div>
+        <div class="phone-list-name">${escapeHtml(name)}</div>
+        <div class="phone-list-meta">${escapeHtml(p.price || ('$'+(p.priceUsd||'')))} · ${escapeHtml(p.chipset || '')} · ${escapeHtml(p.ram || '')} RAM</div>
       </div>
-      <span class="os-badge ${os}">${p.os || p.operatingSystem}</span>
+      <span class="os-badge ${escapeHtml(os)}">${escapeHtml(p.os || p.operatingSystem || '')}</span>
       ${avg !== null ? `<span class="score-pill">${avg}/100</span>` : ''}
     </div>`;
 }
@@ -971,30 +993,7 @@ async function showDetail(encodedName) {
   }
 }
 
-// Fallback: use /phones/search to get details if /phone-details isn't available
-async function post(path, body) {
-  const res = await fetch(path, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-  // If endpoint doesn't exist, fall back gracefully
-  if (res.status === 404 && path === '/phone-details') {
-    const searchRes = await fetch('/phones/search?model=' + encodeURIComponent(body.phone));
-    if (searchRes.ok) {
-      const data = await searchRes.json();
-      const phones = data.phones || [];
-      if (phones.length) return buildDetailFromSearch(phones[0]);
-    }
-    throw new Error('Phone not found');
-  }
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ message: res.statusText }));
-    throw new Error(err.error || err.message || 'Request failed');
-  }
-  return res.json();
-}
-
+// Fallback helper used by post() when /phone-details returns 404
 function buildDetailFromSearch(p) {
   return {
     name: p.name || (p.brand + ' ' + p.model),
@@ -1022,11 +1021,11 @@ function renderModal(d) {
   return `
     <div class="modal-header">
       <div>
-        <div class="modal-title">${d.name}</div>
-        <div style="font-size:13px;color:var(--muted);margin-top:4px">${d.operatingSystem} · ${d.releaseYear}</div>
+        <div class="modal-title">${escapeHtml(d.name)}</div>
+        <div style="font-size:13px;color:var(--muted);margin-top:4px">${escapeHtml(d.operatingSystem)} · ${escapeHtml(String(d.releaseYear ?? ''))}</div>
       </div>
       <div style="display:flex;align-items:center;gap:12px">
-        <div class="modal-price">${d.price}</div>
+        <div class="modal-price">${escapeHtml(d.price)}</div>
         <button class="modal-close" onclick="closeModal()">×</button>
       </div>
     </div>
@@ -1052,7 +1051,7 @@ function renderModal(d) {
 
 function row(key, val) {
   if (!val) return '';
-  return `<div class="spec-row"><span class="spec-key">${key}</span><span class="spec-val">${val}</span></div>`;
+  return `<div class="spec-row"><span class="spec-key">${escapeHtml(key)}</span><span class="spec-val">${escapeHtml(String(val))}</span></div>`;
 }
 
 function closeModal(e) {

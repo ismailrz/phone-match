@@ -130,7 +130,7 @@ describe('RecommendationService', () => {
       expect(results[0]!.phone.operatingSystem).toBe('iOS');
     });
 
-    it('returns empty array when no phones match budget', async () => {
+    it('returns cheapest phones as suggestions when no phones match budget', async () => {
       const phones = [
         makePhone(1, 'Apple', 'iPhone 17 Pro Max', 1099),
         makePhone(2, 'Samsung', 'Galaxy S25 Ultra', 1299),
@@ -144,7 +144,9 @@ describe('RecommendationService', () => {
       const service = new RecommendationService(mockRepo(phones), mockAi(response));
       const results = await service.recommend('best battery phone under $200');
 
-      expect(results).toHaveLength(0);
+      // Should return cheapest alternatives with explanatory message
+      expect(results.length).toBeGreaterThan(0);
+      expect(results[0]!.explanation).toContain('No phones found under $200');
     });
 
     it('returns empty array when database is empty', async () => {

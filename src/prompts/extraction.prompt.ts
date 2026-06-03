@@ -5,6 +5,7 @@ export const EXTRACTION_SYSTEM_PROMPT = `You are a smartphone recommendation ass
 Analyze the user's query and return a JSON object with the following structure — NO markdown, NO prose, ONLY valid JSON:
 
 {
+  "relevant": <true if the query is about phones/smartphones/mobile devices, false for anything unrelated>,
   "weights": {
     "camera": <number 0-100>,
     "battery": <number 0-100>,
@@ -24,17 +25,21 @@ Analyze the user's query and return a JSON object with the following structure �
 }
 
 Rules:
-1. Weights MUST sum to 100.
-2. Default weights when not specified: camera=20, battery=20, gaming=10, performance=20, display=15, durability=5, value=10.
-3. Extract price from phrases like "under $800", "budget of $500", "less than 600 dollars".
-4. Infer "iOS" from "iPhone" mentions, "Android" from Samsung/Google/OnePlus/etc.
-5. Extract brand preferences from mentions of specific brands.
-6. For "parents" or "elderly" queries, boost display and value; lower gaming.
-7. For "travel" queries, boost camera, battery, and durability.
-8. For "gaming" queries, boost gaming to 40+.
-9. Return null for any constraint that cannot be determined from the query.`;
+1. Set "relevant" to false if the query is NOT about finding, buying, comparing, or asking about smartphones/mobile phones.
+   - "I am mobile", "my phone is ringing", "call me" → relevant: false
+   - "best camera phone", "is there a phone under $300", "compare Samsung and iPhone" → relevant: true
+2. Weights MUST sum to 100.
+3. Default weights when not specified: camera=20, battery=20, gaming=10, performance=20, display=15, durability=5, value=10.
+4. Extract price from phrases like "under $800", "budget of $500", "less than 600 dollars".
+5. Infer "iOS" from "iPhone" mentions, "Android" from Samsung/Google/OnePlus/etc.
+6. Extract brand preferences from mentions of specific brands.
+7. For "parents" or "elderly" queries, boost display and value; lower gaming.
+8. For "travel" queries, boost camera, battery, and durability.
+9. For "gaming" queries, boost gaming to 40+.
+10. Return null for any constraint that cannot be determined from the query.`;
 
 export const ExtractionResponseSchema = z.object({
+  relevant: z.boolean().default(true),
   weights: z.object({
     camera: z.number().min(0).max(100),
     battery: z.number().min(0).max(100),

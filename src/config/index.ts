@@ -8,6 +8,7 @@ const envSchema = z.object({
     .transform((v) => parseInt(v, 10)),
   DATABASE_URL: z.string().min(1),
   ANTHROPIC_API_KEY: z.string().optional(),
+  GEMINI_API_KEY: z.string().optional(),
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   LOG_LEVEL: z.enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal']).default('info'),
 });

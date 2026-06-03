@@ -4,6 +4,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 vi.mock('../src/config/index.js', () => ({
   config: {
     ANTHROPIC_API_KEY: undefined,
+    GEMINI_API_KEY: undefined,
     DATABASE_URL: 'postgresql://test:test@localhost:5432/test',
     PORT: 3000,
     NODE_ENV: 'test' as const,
@@ -11,13 +12,23 @@ vi.mock('../src/config/index.js', () => ({
   },
 }));
 
+const mockLogger = {
+  info: () => {},
+  warn: () => {},
+  error: () => {},
+  debug: () => {},
+  trace: () => {},
+  fatal: () => {},
+  child: () => mockLogger,
+} as unknown as import('fastify').FastifyBaseLogger;
+
 import { AiService } from '../src/services/ai.service.js';
 
 describe('AiService (keyword extraction fallback)', () => {
   let service: AiService;
 
   beforeEach(() => {
-    service = new AiService();
+    service = new AiService(mockLogger);
   });
 
   describe('extractWeights()', () => {
@@ -71,11 +82,39 @@ describe('AiService (keyword extraction fallback)', () => {
       expect(result.constraints?.maxPriceUsd).toBe(700);
     });
 
-    it('handles generic query with default weights', async () => {
-      const result = await service.extractWeights('recommend me a good phone');
-      expect(result.weights.camera).toBeGreaterThan(0);
-      expect(result.weights.battery).toBeGreaterThan(0);
-      expect(result.weights.performance).toBeGreaterThan(0);
+    it('rejects "I am mobile" as not phone-related', async () => {
+      const result = await service.extractWeights('I am mobile');
+      expect(result.relevant).toBe(false);
+    });
+
+    it('rejects "my phone is ringing" as not phone-shopping', async () => {
+      const result = await service.extractWeights('my phone is ringing');
+      expect(result.relevant).toBe(false);
+    });
+
+    it('rejects random gibberish', async () => {
+      const result = await service.extractWeights('asdfghjkl qwerty');
+      expect(result.relevant).toBe(false);
+    });
+
+    it('rejects unrelated topics', async () => {
+      const result = await service.extractWeights('what is the weather today');
+      expect(result.relevant).toBe(false);
+    });
+
+    it('accepts "best camera phone" as relevant', async () => {
+      const result = await service.extractWeights('best camera phone under $800');
+      expect(result.relevant).toBe(true);
+    });
+
+    it('accepts "is there a phone under $300" as relevant', async () => {
+      const result = await service.extractWeights('is there a phone under $300');
+      expect(result.relevant).toBe(true);
+    });
+
+    it('accepts brand names without extra intent as relevant', async () => {
+      const result = await service.extractWeights('Samsung Galaxy S25');
+      expect(result.relevant).toBe(true);
     });
 
     it('all returned weights are non-negative', async () => {

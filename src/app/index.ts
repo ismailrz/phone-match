@@ -3,12 +3,13 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
+import rateLimit from '@fastify/rate-limit';
 import staticPlugin from '@fastify/static';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import type { FastifyInstance } from 'fastify';
 import { config } from '../config/index.js';
-import { db } from '../db/index.js';
+import { db, pool } from '../db/index.js';
 import { PhoneRepository } from '../repositories/phone.repository.js';
 import { AiService } from '../services/ai.service.js';
 import { PhoneService } from '../modules/phones/phone.service.js';
@@ -41,7 +42,7 @@ export async function buildApp(): Promise<FastifyInstance> {
 
   // ── Composition root ──────────────────────────────────────────────────────
   const repo = new PhoneRepository(db);
-  const aiService = new AiService();
+  const aiService = new AiService(app.log);
   const phoneService = new PhoneService(repo);
   const recommendationService = new RecommendationService(repo, aiService);
   const comparisonService = new ComparisonService(repo);
@@ -49,9 +50,20 @@ export async function buildApp(): Promise<FastifyInstance> {
 
   const toolDeps = { recommendationService, comparisonService, phoneService, searchService };
 
-  // ── CORS (registered before MCP routes to avoid onSend hook conflicts) ───
+  // ── Rate limiting ─────────────────────────────────────────────────────────
+  await app.register(rateLimit, {
+    max: 60,
+    timeWindow: '1 minute',
+    errorResponseBuilder: () => ({
+      error: 'Too Many Requests',
+      message: 'Rate limit exceeded. Please wait before sending more requests.',
+      statusCode: 429,
+    }),
+  });
+
+  // ── CORS ──────────────────────────────────────────────────────────────────
   await app.register(cors, {
-    origin: true,
+    origin: config.NODE_ENV === 'production' ? false : true,
     hook: 'preHandler',
   });
 
@@ -69,11 +81,23 @@ export async function buildApp(): Promise<FastifyInstance> {
     return reply.sendFile('index.html', publicDir);
   });
 
-  app.get('/health', async () => ({
-    status: 'ok',
-    timestamp: new Date().toISOString(),
-    version: '1.0.0',
-  }));
+  app.get('/health', async (_req, reply) => {
+    try {
+      await pool.query('SELECT 1');
+      return reply.send({
+        status: 'ok',
+        timestamp: new Date().toISOString(),
+        version: '1.0.0',
+        aiProvider: aiService.provider,
+        db: 'connected',
+      });
+    } catch {
+      return reply.status(503).send({
+        status: 'error',
+        db: 'disconnected',
+      });
+    }
+  });
 
   app.get('/phones', async (request, reply) => {
     const query = PaginationQuerySchema.safeParse(request.query);
@@ -104,8 +128,13 @@ export async function buildApp(): Promise<FastifyInstance> {
     if (!body.success) {
       return reply.status(400).send({ error: 'Invalid request', details: body.error.flatten() });
     }
-    const results = await recommendationService.recommend(body.data.query);
-    return { query: body.data.query, recommendations: results };
+    try {
+      const results = await recommendationService.recommend(body.data.query);
+      return { query: body.data.query, recommendations: results };
+    } catch (err) {
+      app.log.error({ err }, 'Recommendation failed');
+      return reply.status(500).send({ error: 'Recommendation service unavailable' });
+    }
   });
 
   app.post('/compare', async (request, reply) => {
@@ -169,38 +198,24 @@ export async function buildApp(): Promise<FastifyInstance> {
   // ── MCP routes ────────────────────────────────────────────────────────────
   const sessions = new Map<string, McpSession>();
 
-  // POST /mcp — initialize or continue a session
   app.post('/mcp', async (request, reply) => {
     reply.hijack();
-
     try {
       const sessionId =
         (request.headers['mcp-session-id'] as string | undefined) ?? randomUUID();
-
       let session = sessions.get(sessionId);
-
       if (!session) {
         const transport = new StreamableHTTPServerTransport({
           sessionIdGenerator: () => sessionId,
         });
-        const mcpServer = new McpServer({
-          name: 'PhoneMatch',
-          version: '1.0.0',
-        });
-
+        const mcpServer = new McpServer({ name: 'PhoneMatch', version: '1.0.0' });
         registerAllTools(mcpServer, toolDeps);
         await mcpServer.connect(transport);
-
-        transport.onclose = () => {
-          sessions.delete(sessionId);
-        };
-
+        transport.onclose = () => sessions.delete(sessionId);
         session = { server: mcpServer, transport };
         sessions.set(sessionId, session);
-
         app.log.info({ sessionId }, 'MCP session created');
       }
-
       await session.transport.handleRequest(request.raw, reply.raw, request.body);
     } catch (err) {
       app.log.error(err, 'MCP POST error');
@@ -211,10 +226,8 @@ export async function buildApp(): Promise<FastifyInstance> {
     }
   });
 
-  // GET /mcp — SSE stream for server-to-client notifications
   app.get('/mcp', async (request, reply) => {
     reply.hijack();
-
     try {
       const sessionId = request.headers['mcp-session-id'] as string | undefined;
       if (!sessionId) {
@@ -222,14 +235,12 @@ export async function buildApp(): Promise<FastifyInstance> {
         reply.raw.end(JSON.stringify({ error: 'mcp-session-id header required' }));
         return;
       }
-
       const session = sessions.get(sessionId);
       if (!session) {
         reply.raw.writeHead(404, { 'Content-Type': 'application/json' });
         reply.raw.end(JSON.stringify({ error: 'Session not found' }));
         return;
       }
-
       await session.transport.handleRequest(request.raw, reply.raw);
     } catch (err) {
       app.log.error(err, 'MCP GET error');
@@ -240,23 +251,16 @@ export async function buildApp(): Promise<FastifyInstance> {
     }
   });
 
-  // DELETE /mcp — tear down session (normal Fastify response, no hijack)
   app.delete('/mcp', async (request, reply) => {
     const sessionId = request.headers['mcp-session-id'] as string | undefined;
-
     if (sessionId) {
       const session = sessions.get(sessionId);
       if (session) {
-        try {
-          await session.transport.close();
-        } catch {
-          // Ignore close errors
-        }
+        try { await session.transport.close(); } catch { /* ignore */ }
         sessions.delete(sessionId);
         app.log.info({ sessionId }, 'MCP session deleted');
       }
     }
-
     return reply.status(204).send();
   });
 

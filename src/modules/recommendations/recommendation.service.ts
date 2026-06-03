@@ -1,6 +1,7 @@
 import type { AiService } from '../../services/ai.service.js';
 import type { PhoneRepository } from '../../repositories/phone.repository.js';
 import type { PhoneWithScores, RecommendationResult } from '../../types/index.js';
+import type { ExtractionResponse } from '../../prompts/extraction.prompt.js';
 import {
   computeWeightedScore,
   computeRawScore,
@@ -8,15 +9,7 @@ import {
   mapWeightKeys,
 } from '../../utils/scoring.js';
 
-const SCORE_KEYS_FOR_LOG = [
-  'camera',
-  'battery',
-  'gaming',
-  'performance',
-  'display',
-  'durability',
-  'value',
-] as const;
+type Constraints = NonNullable<ExtractionResponse['constraints']>;
 
 export class RecommendationService {
   constructor(
@@ -25,7 +18,11 @@ export class RecommendationService {
   ) {}
 
   async recommend(query: string): Promise<RecommendationResult[]> {
-    const { weights, constraints } = await this.aiService.extractWeights(query);
+    const { relevant, weights, constraints } = await this.aiService.extractWeights(query);
+
+    if (relevant === false) {
+      return [];
+    }
 
     const mappedWeights = mapWeightKeys(weights);
 
@@ -37,12 +34,22 @@ export class RecommendationService {
     }
 
     // Apply filters and get top 5
-    const results = this.rankPhones(phones, mappedWeights, constraints, weights);
+    const results = this.rankPhones(phones, mappedWeights, constraints);
 
     // Relax brand constraint if fewer than 2 results
     if (results.length < 2 && constraints?.preferredBrands?.length) {
-      const relaxed = this.rankPhones(phones, mappedWeights, { ...constraints, preferredBrands: [] }, weights);
-      return relaxed;
+      return this.rankPhones(phones, mappedWeights, { ...constraints, preferredBrands: [] });
+    }
+
+    // If budget is set but nothing found, return cheapest phones as suggestions
+    if (results.length === 0 && constraints?.maxPriceUsd != null) {
+      const sorted = [...phones].sort((a, b) => a.priceUsd - b.priceUsd).slice(0, 5);
+      return sorted.map((phone, index) => ({
+        rank: index + 1,
+        phone,
+        finalScore: computeWeightedScore(phone.scores, mappedWeights),
+        explanation: `No phones found under $${constraints.maxPriceUsd}. The most affordable option is ${phone.brand} ${phone.model} at $${phone.priceUsd}.`,
+      }));
     }
 
     return results;
@@ -51,14 +58,12 @@ export class RecommendationService {
   private rankPhones(
     phones: PhoneWithScores[],
     mappedWeights: ReturnType<typeof mapWeightKeys>,
-    constraints: Record<string, unknown> | undefined,
-    _rawWeights: Record<string, number>,
+    constraints: Constraints | undefined,
   ): RecommendationResult[] {
     let filtered = [...phones];
 
-    // Price filters
-    const maxPrice = (constraints as Record<string, unknown> | undefined)?.['maxPriceUsd'];
-    const minPrice = (constraints as Record<string, unknown> | undefined)?.['minPriceUsd'];
+    const maxPrice = constraints?.maxPriceUsd;
+    const minPrice = constraints?.minPriceUsd;
     if (typeof maxPrice === 'number') {
       filtered = filtered.filter((p) => p.priceUsd <= maxPrice);
     }
@@ -66,17 +71,15 @@ export class RecommendationService {
       filtered = filtered.filter((p) => p.priceUsd >= minPrice);
     }
 
-    // Brand preference filter
-    const preferredBrands = (constraints as Record<string, unknown> | undefined)?.['preferredBrands'];
-    if (Array.isArray(preferredBrands) && preferredBrands.length > 0) {
-      const brandSet = new Set((preferredBrands as string[]).map((b) => b.toLowerCase()));
+    const preferredBrands = constraints?.preferredBrands;
+    if (preferredBrands && preferredBrands.length > 0) {
+      const brandSet = new Set(preferredBrands.map((b) => b.toLowerCase()));
       filtered = filtered.filter((p) => brandSet.has(p.brand.toLowerCase()));
     }
 
-    // Required features
-    const requiredFeatures = (constraints as Record<string, unknown> | undefined)?.['requiredFeatures'];
-    if (Array.isArray(requiredFeatures)) {
-      for (const feature of requiredFeatures as string[]) {
+    const requiredFeatures = constraints?.requiredFeatures;
+    if (requiredFeatures) {
+      for (const feature of requiredFeatures) {
         if (feature === 'esim') {
           filtered = filtered.filter((p) => p.esimSupport);
         }
@@ -86,7 +89,7 @@ export class RecommendationService {
       }
     }
 
-    // Score and rank — sort by raw (unrounded) score for precision, display rounded score
+    // Sort by raw (unrounded) score for tie-breaking precision
     const scored = filtered.map((phone) => ({
       phone,
       rawScore: computeRawScore(phone.scores, mappedWeights),
@@ -101,13 +104,5 @@ export class RecommendationService {
       finalScore,
       explanation: generateExplanation(phone, mappedWeights, finalScore),
     }));
-  }
-
-  getScoreBreakdown(weights: Record<string, number>): Record<string, number> {
-    const breakdown: Record<string, number> = {};
-    for (const key of SCORE_KEYS_FOR_LOG) {
-      if (weights[key] !== undefined) breakdown[key] = weights[key] ?? 0;
-    }
-    return breakdown;
   }
 }

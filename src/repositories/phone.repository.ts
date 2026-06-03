@@ -101,8 +101,38 @@ export class PhoneRepository {
     return mapRow(rows[0] as RawRow);
   }
 
+  // Single batch query instead of N individual queries — avoids N+1
   async findByNames(names: string[]): Promise<(PhoneWithScores | null)[]> {
-    return Promise.all(names.map((name) => this.findByName(name)));
+    if (names.length === 0) return [];
+
+    const conditions = names.map((name) => {
+      const n = name.trim().toLowerCase();
+      return or(
+        ilike(sql`${phones.brand} || ' ' || ${phones.model}`, `%${n}%`),
+        ilike(phones.model, `%${n}%`),
+      );
+    });
+
+    const rows = await this.db
+      .select()
+      .from(phones)
+      .leftJoin(phoneScores, eq(phones.id, phoneScores.phoneId))
+      .where(or(...conditions));
+
+    const mapped = rows
+      .map((r) => mapRow(r as RawRow))
+      .filter((p): p is PhoneWithScores => p !== null);
+
+    return names.map((name) => {
+      const n = name.trim().toLowerCase();
+      return (
+        mapped.find(
+          (p) =>
+            `${p.brand} ${p.model}`.toLowerCase().includes(n) ||
+            p.model.toLowerCase().includes(n),
+        ) ?? null
+      );
+    });
   }
 
   async search(filters: SearchFilters): Promise<PhoneWithScores[]> {
@@ -128,17 +158,18 @@ export class PhoneRepository {
       .select()
       .from(phones)
       .leftJoin(phoneScores, eq(phones.id, phoneScores.phoneId))
-      .where(conditions.length > 0 ? and(...conditions) : undefined);
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .limit(100);
 
     let results = rows
       .map((r) => mapRow(r as RawRow))
       .filter((p): p is PhoneWithScores => p !== null);
 
     if (filters.minRam !== undefined) {
-      results = results.filter((p) => p.ram >= (filters.minRam ?? 0));
+      results = results.filter((p) => p.ram >= filters.minRam!);
     }
     if (filters.minStorage !== undefined) {
-      results = results.filter((p) => p.storage >= (filters.minStorage ?? 0));
+      results = results.filter((p) => p.storage >= filters.minStorage!);
     }
 
     return results;
