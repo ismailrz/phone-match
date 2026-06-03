@@ -1,0 +1,1068 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PhoneMatch — Find Your Perfect Phone</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0f0f13;
+      --surface: #1a1a24;
+      --surface2: #22222e;
+      --border: #2e2e40;
+      --accent: #6c63ff;
+      --accent2: #a78bfa;
+      --text: #e8e8f0;
+      --muted: #8888a8;
+      --green: #34d399;
+      --yellow: #fbbf24;
+      --red: #f87171;
+      --radius: 12px;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    header {
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px;
+    }
+    .header-inner {
+      max-width: 1100px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      height: 64px;
+    }
+    .logo {
+      font-size: 22px;
+      font-weight: 700;
+      background: linear-gradient(135deg, #6c63ff, #a78bfa);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .logo-sub { font-size: 13px; color: var(--muted); font-weight: 400; }
+
+    /* ── Tabs ── */
+    nav {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px;
+    }
+    .tabs {
+      max-width: 1100px;
+      margin: 0 auto;
+      display: flex;
+      gap: 4px;
+    }
+    .tab {
+      padding: 14px 20px;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--muted);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: all .2s;
+      user-select: none;
+    }
+    .tab:hover { color: var(--text); }
+    .tab.active { color: var(--accent2); border-bottom-color: var(--accent); }
+
+    /* ── Main layout ── */
+    main { max-width: 1100px; margin: 32px auto; padding: 0 24px; }
+    .panel { display: none; }
+    .panel.active { display: block; }
+
+    /* ── Input card ── */
+    .input-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      margin-bottom: 28px;
+    }
+    .input-card h2 { font-size: 18px; font-weight: 600; margin-bottom: 6px; }
+    .input-card p { font-size: 14px; color: var(--muted); margin-bottom: 20px; }
+
+    .search-row {
+      display: flex;
+      gap: 12px;
+    }
+    .search-row input, .search-row select {
+      flex: 1;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 16px;
+      font-size: 15px;
+      color: var(--text);
+      outline: none;
+      transition: border-color .2s;
+    }
+    .search-row input:focus, .search-row select:focus {
+      border-color: var(--accent);
+    }
+    .search-row input::placeholder { color: var(--muted); }
+    .search-row select option { background: var(--surface2); }
+
+    button.primary {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 12px 24px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity .2s, transform .1s;
+      white-space: nowrap;
+    }
+    button.primary:hover { opacity: .9; }
+    button.primary:active { transform: scale(.97); }
+    button.primary:disabled { opacity: .5; cursor: default; }
+
+    button.ghost {
+      background: transparent;
+      color: var(--muted);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 14px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all .2s;
+    }
+    button.ghost:hover { color: var(--text); border-color: var(--muted); }
+
+    /* ── Filter grid ── */
+    .filter-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .filter-grid label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 4px; }
+    .filter-grid input, .filter-grid select {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 14px;
+      color: var(--text);
+      outline: none;
+    }
+    .filter-grid input:focus, .filter-grid select:focus { border-color: var(--accent); }
+
+    /* ── Phone tags (compare input) ── */
+    .phone-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 12px;
+      min-height: 40px;
+      align-items: flex-start;
+    }
+    .tag {
+      background: var(--accent);
+      background: linear-gradient(135deg, #6c63ff22, #a78bfa22);
+      border: 1px solid #6c63ff55;
+      color: var(--accent2);
+      border-radius: 20px;
+      padding: 4px 12px;
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .tag-remove {
+      cursor: pointer;
+      opacity: .6;
+      font-size: 16px;
+      line-height: 1;
+    }
+    .tag-remove:hover { opacity: 1; }
+    .add-row { display: flex; gap: 8px; }
+    .add-row input {
+      flex: 1;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 14px;
+      color: var(--text);
+      outline: none;
+    }
+    .add-row input:focus { border-color: var(--accent); }
+
+    /* ── Loading spinner ── */
+    .spinner {
+      display: inline-block;
+      width: 18px; height: 18px;
+      border: 2px solid #ffffff44;
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin .6s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Empty / error states ── */
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--muted);
+    }
+    .empty-state .icon { font-size: 48px; margin-bottom: 12px; }
+    .empty-state p { font-size: 15px; }
+    .error-state {
+      background: #f8717122;
+      border: 1px solid #f8717155;
+      border-radius: var(--radius);
+      padding: 16px 20px;
+      color: #f87171;
+      font-size: 14px;
+      margin-bottom: 20px;
+    }
+
+    /* ── Recommendation cards ── */
+    .results-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 16px;
+    }
+    .phone-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      transition: border-color .2s, transform .2s;
+      cursor: pointer;
+    }
+    .phone-card:hover {
+      border-color: #6c63ff55;
+      transform: translateY(-2px);
+    }
+    .card-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      margin-bottom: 14px;
+      gap: 12px;
+    }
+    .rank-badge {
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #fff;
+      font-size: 12px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .rank-badge.gold { background: linear-gradient(135deg, #f59e0b, #fbbf24); }
+    .rank-badge.silver { background: linear-gradient(135deg, #94a3b8, #cbd5e1); }
+    .rank-badge.bronze { background: linear-gradient(135deg, #b45309, #d97706); }
+
+    .phone-name { font-size: 16px; font-weight: 600; flex: 1; }
+    .phone-price {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--green);
+      white-space: nowrap;
+    }
+
+    .score-ring {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+    .big-score {
+      font-size: 36px;
+      font-weight: 800;
+      line-height: 1;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .score-label { font-size: 12px; color: var(--muted); }
+
+    .explanation {
+      font-size: 13px;
+      color: var(--muted);
+      line-height: 1.5;
+      margin-bottom: 16px;
+    }
+
+    .score-bars { display: flex; flex-direction: column; gap: 6px; }
+    .bar-row { display: flex; align-items: center; gap: 8px; }
+    .bar-label { font-size: 11px; color: var(--muted); width: 72px; flex-shrink: 0; }
+    .bar-track {
+      flex: 1;
+      height: 4px;
+      background: var(--surface2);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .bar-fill {
+      height: 100%;
+      border-radius: 2px;
+      transition: width .4s ease;
+    }
+    .bar-val { font-size: 11px; color: var(--muted); width: 24px; text-align: right; flex-shrink: 0; }
+
+    .spec-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 14px;
+      padding-top: 14px;
+      border-top: 1px solid var(--border);
+    }
+    .chip {
+      background: var(--surface2);
+      border-radius: 6px;
+      padding: 3px 8px;
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    /* ── Comparison table ── */
+    .compare-wrap { overflow-x: auto; }
+    .compare-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+    .compare-table th {
+      background: var(--surface);
+      padding: 14px 16px;
+      text-align: left;
+      font-weight: 600;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+    .compare-table th.phone-col {
+      background: linear-gradient(135deg, #6c63ff15, #a78bfa15);
+      color: var(--accent2);
+    }
+    .compare-table th.winner-col {
+      background: linear-gradient(135deg, #34d39920, #059669330);
+      color: var(--green);
+      position: relative;
+    }
+    .compare-table th.winner-col::after {
+      content: '👑';
+      margin-left: 6px;
+    }
+    .compare-table td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: middle;
+    }
+    .compare-table tr:last-child td { border-bottom: none; }
+    .compare-table .dim-label { color: var(--muted); font-size: 13px; }
+    .compare-table .score-cell { font-weight: 600; font-size: 15px; }
+    .compare-table .score-cell.best { color: var(--green); }
+    .score-mini-bar {
+      display: inline-block;
+      height: 3px;
+      background: var(--green);
+      border-radius: 2px;
+      vertical-align: middle;
+      margin-left: 6px;
+      opacity: .5;
+    }
+    .winner-banner {
+      background: linear-gradient(135deg, #34d39915, #05966915);
+      border: 1px solid #34d39933;
+      border-radius: var(--radius);
+      padding: 16px 20px;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .winner-banner .crown { font-size: 24px; }
+    .winner-banner strong { font-size: 16px; color: var(--green); }
+    .winner-banner p { font-size: 13px; color: var(--muted); margin-top: 2px; }
+
+    /* ── Phone list (search results) ── */
+    .phone-list { display: flex; flex-direction: column; gap: 12px; }
+    .phone-list-item {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      cursor: pointer;
+      transition: border-color .2s;
+    }
+    .phone-list-item:hover { border-color: #6c63ff55; }
+    .phone-list-info { flex: 1; }
+    .phone-list-name { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+    .phone-list-meta { font-size: 13px; color: var(--muted); }
+    .os-badge {
+      font-size: 11px;
+      padding: 3px 8px;
+      border-radius: 20px;
+      font-weight: 600;
+    }
+    .os-badge.ios { background: #1d4ed833; color: #60a5fa; }
+    .os-badge.android { background: #15803d33; color: #4ade80; }
+    .score-pill {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--accent2);
+      background: #6c63ff22;
+      border-radius: 8px;
+      padding: 4px 10px;
+      white-space: nowrap;
+    }
+
+    /* ── Modal / detail overlay ── */
+    .modal-overlay {
+      position: fixed; inset: 0;
+      background: #000000cc;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      padding: 20px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .2s;
+    }
+    .modal-overlay.open { opacity: 1; pointer-events: all; }
+    .modal {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      width: 100%;
+      max-width: 560px;
+      max-height: 85vh;
+      overflow-y: auto;
+      padding: 28px;
+      transform: translateY(20px);
+      transition: transform .2s;
+    }
+    .modal-overlay.open .modal { transform: translateY(0); }
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 20px;
+    }
+    .modal-title { font-size: 20px; font-weight: 700; }
+    .modal-price { font-size: 18px; font-weight: 700; color: var(--green); }
+    .modal-close {
+      background: var(--surface2);
+      border: none;
+      color: var(--muted);
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      cursor: pointer;
+      font-size: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-close:hover { color: var(--text); }
+    .spec-section { margin-bottom: 20px; }
+    .spec-section h3 {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+    .spec-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 14px;
+    }
+    .spec-row:last-child { border-bottom: none; }
+    .spec-key { color: var(--muted); }
+    .spec-val { font-weight: 500; }
+
+    /* ── Score color util ── */
+    .s90 { background: #34d399; }
+    .s80 { background: #6ee7b7; }
+    .s70 { background: #fbbf24; }
+    .s60 { background: #fb923c; }
+    .slow { background: #f87171; }
+
+    /* ── Result count ── */
+    .result-meta {
+      font-size: 13px;
+      color: var(--muted);
+      margin-bottom: 16px;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <div>
+      <div class="logo">📱 PhoneMatch</div>
+    </div>
+    <div class="logo-sub">AI-powered smartphone recommendations</div>
+  </div>
+</header>
+
+<nav>
+  <div class="tabs">
+    <div class="tab active" data-tab="recommend">🔍 Recommend</div>
+    <div class="tab" data-tab="compare">⚖️ Compare</div>
+    <div class="tab" data-tab="search">🗂️ Search</div>
+  </div>
+</nav>
+
+<main>
+
+  <!-- ── RECOMMEND ── -->
+  <div class="panel active" id="panel-recommend">
+    <div class="input-card">
+      <h2>Find your perfect phone</h2>
+      <p>Describe what matters most — camera, battery, gaming, budget, brand preferences…</p>
+      <div class="search-row">
+        <input type="text" id="rec-input" placeholder="e.g. best camera phone under $800, gaming phone with long battery…" />
+        <button class="primary" id="rec-btn" onclick="doRecommend()">Find phones</button>
+      </div>
+      <div style="margin-top:12px; display:flex; gap:8px; flex-wrap:wrap;">
+        <button class="ghost" onclick="quickQuery('best camera phone under $800')">📷 Camera &lt;$800</button>
+        <button class="ghost" onclick="quickQuery('gaming phone under $700')">🎮 Gaming &lt;$700</button>
+        <button class="ghost" onclick="quickQuery('best battery life phone')">🔋 Battery</button>
+        <button class="ghost" onclick="quickQuery('phone for my parents large screen simple')">👴 Parents</button>
+        <button class="ghost" onclick="quickQuery('best value phone under $400')">💰 Value &lt;$400</button>
+      </div>
+    </div>
+    <div id="rec-results"></div>
+  </div>
+
+  <!-- ── COMPARE ── -->
+  <div class="panel" id="panel-compare">
+    <div class="input-card">
+      <h2>Compare phones side by side</h2>
+      <p>Add 2–5 phones to compare scores across all dimensions.</p>
+      <div class="phone-tags" id="compare-tags"></div>
+      <div class="add-row">
+        <input type="text" id="compare-input" placeholder="Type a phone name and press Enter…" />
+        <button class="primary" id="compare-btn" onclick="doCompare()">Compare</button>
+      </div>
+    </div>
+    <div id="compare-results"></div>
+  </div>
+
+  <!-- ── SEARCH ── -->
+  <div class="panel" id="panel-search">
+    <div class="input-card">
+      <h2>Search & filter</h2>
+      <p>Filter phones by brand, price range, OS, or specs.</p>
+      <div class="filter-grid">
+        <div>
+          <label>Brand</label>
+          <input type="text" id="s-brand" placeholder="Samsung, Apple…" />
+        </div>
+        <div>
+          <label>OS</label>
+          <select id="s-os">
+            <option value="">Any</option>
+            <option value="Android">Android</option>
+            <option value="iOS">iOS</option>
+          </select>
+        </div>
+        <div>
+          <label>Max price (USD)</label>
+          <input type="number" id="s-max" placeholder="800" />
+        </div>
+        <div>
+          <label>Min price (USD)</label>
+          <input type="number" id="s-min" placeholder="0" />
+        </div>
+        <div>
+          <label>Min RAM (GB)</label>
+          <input type="number" id="s-ram" placeholder="8" />
+        </div>
+        <div>
+          <label>Min storage (GB)</label>
+          <input type="number" id="s-storage" placeholder="128" />
+        </div>
+      </div>
+      <button class="primary" onclick="doSearch()">Search</button>
+    </div>
+    <div id="search-results"></div>
+  </div>
+
+</main>
+
+<!-- ── DETAIL MODAL ── -->
+<div class="modal-overlay" id="modal-overlay" onclick="closeModal(event)">
+  <div class="modal" id="modal-body"></div>
+</div>
+
+<script>
+// ── Tab switching ──────────────────────────────────────────────────────────
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('panel-' + tab.dataset.tab).classList.add('active');
+  });
+});
+
+// ── Compare tag input ──────────────────────────────────────────────────────
+const comparePhones = [];
+const compareInput = document.getElementById('compare-input');
+compareInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter') addComparePhone();
+});
+
+function addComparePhone() {
+  const val = compareInput.value.trim();
+  if (!val || comparePhones.includes(val) || comparePhones.length >= 5) return;
+  comparePhones.push(val);
+  renderCompareTags();
+  compareInput.value = '';
+}
+
+function removeComparePhone(name) {
+  const i = comparePhones.indexOf(name);
+  if (i !== -1) comparePhones.splice(i, 1);
+  renderCompareTags();
+}
+
+function renderCompareTags() {
+  const el = document.getElementById('compare-tags');
+  el.innerHTML = comparePhones.map(p => `
+    <div class="tag">
+      ${p}
+      <span class="tag-remove" onclick="removeComparePhone('${p.replace(/'/g,"\\'")}')">×</span>
+    </div>
+  `).join('');
+}
+
+// ── Quick queries ──────────────────────────────────────────────────────────
+function quickQuery(q) {
+  document.getElementById('rec-input').value = q;
+  doRecommend();
+}
+
+// ── Score color class ──────────────────────────────────────────────────────
+function scoreClass(n) {
+  if (n >= 90) return 's90';
+  if (n >= 80) return 's80';
+  if (n >= 70) return 's70';
+  if (n >= 60) return 's60';
+  return 'slow';
+}
+
+function scoreColor(n) {
+  if (n >= 90) return '#34d399';
+  if (n >= 80) return '#6ee7b7';
+  if (n >= 70) return '#fbbf24';
+  if (n >= 60) return '#fb923c';
+  return '#f87171';
+}
+
+// ── Loading state helpers ──────────────────────────────────────────────────
+function setLoading(btnId, loading) {
+  const btn = document.getElementById(btnId);
+  if (loading) {
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span>';
+  } else {
+    btn.disabled = false;
+    btn.textContent = btnId === 'rec-btn' ? 'Find phones' : btnId === 'compare-btn' ? 'Compare' : 'Search';
+  }
+}
+
+// ── API helpers ────────────────────────────────────────────────────────────
+async function post(path, body) {
+  const res = await fetch(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ message: res.statusText }));
+    throw new Error(err.error || err.message || 'Request failed');
+  }
+  return res.json();
+}
+
+async function get(path) {
+  const res = await fetch(path);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ message: res.statusText }));
+    throw new Error(err.error || err.message || 'Request failed');
+  }
+  return res.json();
+}
+
+// ── Score bars renderer ────────────────────────────────────────────────────
+function renderScoreBars(scores) {
+  const dims = [
+    ['cameraScore', 'Camera'],
+    ['batteryScore', 'Battery'],
+    ['performanceScore', 'Perf'],
+    ['gamingScore', 'Gaming'],
+    ['displayScore', 'Display'],
+    ['durabilityScore', 'Durability'],
+    ['valueScore', 'Value'],
+  ];
+  return dims.map(([key, label]) => {
+    const val = scores[key] ?? 0;
+    return `
+      <div class="bar-row">
+        <span class="bar-label">${label}</span>
+        <div class="bar-track">
+          <div class="bar-fill ${scoreClass(val)}" style="width:${val}%"></div>
+        </div>
+        <span class="bar-val">${val}</span>
+      </div>`;
+  }).join('');
+}
+
+// ── Spec chips ─────────────────────────────────────────────────────────────
+function renderChips(phone) {
+  const specs = [
+    phone.keySpecs?.chipset || phone.specifications?.chipset,
+    phone.keySpecs?.ram ? phone.keySpecs.ram + ' RAM' : null,
+    phone.keySpecs?.battery || (phone.specifications?.battery?.capacity),
+    phone.keySpecs?.display || null,
+    phone.keySpecs?.waterproof !== 'N/A' ? (phone.keySpecs?.waterproof || phone.specifications?.waterproofRating) : null,
+    phone.keySpecs?.eSIM || phone.specifications?.eSIM ? 'eSIM' : null,
+  ].filter(Boolean);
+  return specs.map(s => `<span class="chip">${s}</span>`).join('');
+}
+
+// ── RECOMMEND ─────────────────────────────────────────────────────────────
+async function doRecommend() {
+  const query = document.getElementById('rec-input').value.trim();
+  if (!query) return;
+  const container = document.getElementById('rec-results');
+  setLoading('rec-btn', true);
+  container.innerHTML = '';
+
+  try {
+    const data = await post('/recommend', { query });
+    const recs = data.recommendations || data;
+
+    if (!recs.length) {
+      container.innerHTML = `<div class="empty-state"><div class="icon">😔</div><p>No phones found. Try a different query or relax your budget.</p></div>`;
+      return;
+    }
+
+    container.innerHTML = `<div class="result-meta">Found ${recs.length} recommendation${recs.length !== 1 ? 's' : ''}</div><div class="results-grid">${recs.map(renderRecCard).join('')}</div>`;
+  } catch (e) {
+    container.innerHTML = `<div class="error-state">⚠️ ${e.message}</div>`;
+  } finally {
+    setLoading('rec-btn', false);
+  }
+}
+
+function rankBadgeClass(rank) {
+  if (rank === 1) return 'gold';
+  if (rank === 2) return 'silver';
+  if (rank === 3) return 'bronze';
+  return '';
+}
+
+function renderRecCard(r) {
+  const s = r.scores || r.phone?.scores || {};
+  const phone = r.phone || r;
+  const name = r.phone ? r.phone.brand + ' ' + r.phone.model : r.phone;
+  const price = r.price || (r.phone ? '$' + r.phone.priceUsd : '');
+  const os = r.os || r.phone?.operatingSystem || '';
+  return `
+  <div class="phone-card" onclick="showDetail('${encodeURIComponent(name)}')">
+    <div class="card-header">
+      <div class="rank-badge ${rankBadgeClass(r.rank)}">${r.rank}</div>
+      <div class="phone-name">${name}</div>
+      <div class="phone-price">${price}</div>
+    </div>
+    <div class="score-ring">
+      <div>
+        <div class="big-score">${r.score ?? r.finalScore}</div>
+        <div class="score-label">${os}</div>
+      </div>
+    </div>
+    <div class="explanation">${r.explanation}</div>
+    <div class="score-bars">${renderScoreBars(s)}</div>
+    <div class="spec-chips">${renderChips(r)}</div>
+  </div>`;
+}
+
+document.getElementById('rec-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') doRecommend();
+});
+
+// ── COMPARE ───────────────────────────────────────────────────────────────
+async function doCompare() {
+  if (comparePhones.length < 2) {
+    // try adding current input value
+    addComparePhone();
+    if (comparePhones.length < 2) {
+      alert('Add at least 2 phones to compare.');
+      return;
+    }
+  }
+  const container = document.getElementById('compare-results');
+  setLoading('compare-btn', true);
+  container.innerHTML = '';
+
+  try {
+    const data = await post('/compare', { phones: [...comparePhones] });
+    container.innerHTML = renderComparison(data);
+  } catch (e) {
+    container.innerHTML = `<div class="error-state">⚠️ ${e.message}</div>`;
+  } finally {
+    setLoading('compare-btn', false);
+  }
+}
+
+function renderComparison(data) {
+  const phones = data.phones || [];
+  const winner = data.winner;
+  const analysis = data.analysis || [];
+  const winnerName = winner ? winner.brand + ' ' + winner.model : '';
+
+  const dims = [
+    ['cameraScore', '📷 Camera'],
+    ['batteryScore', '🔋 Battery'],
+    ['performanceScore', '⚡ Performance'],
+    ['gamingScore', '🎮 Gaming'],
+    ['displayScore', '🖥️ Display'],
+    ['durabilityScore', '🛡️ Durability'],
+    ['valueScore', '💰 Value'],
+  ];
+
+  const names = phones.map(p => p.brand + ' ' + p.model);
+  const winnerIdx = phones.findIndex(p => p.brand + ' ' + p.model === winnerName);
+
+  const headerCols = phones.map((p, i) => {
+    const name = p.brand + ' ' + p.model;
+    const isWinner = i === winnerIdx;
+    return `<th class="${isWinner ? 'winner-col' : 'phone-col'}">${name}<br><span style="font-size:12px;font-weight:400;color:var(--muted)">$${p.priceUsd} · ${p.operatingSystem}</span></th>`;
+  }).join('');
+
+  const rows = dims.map(([key, label]) => {
+    const scores = phones.map(p => (p.scores || {})[key] ?? 0);
+    const maxScore = Math.max(...scores);
+    const cells = scores.map((s, i) => {
+      const isBest = s === maxScore;
+      return `<td class="score-cell ${isBest ? 'best' : ''}">${s}<span class="score-mini-bar" style="width:${s * 0.4}px;background:${scoreColor(s)}"></span></td>`;
+    }).join('');
+    return `<tr><td class="dim-label">${label}</td>${cells}</tr>`;
+  }).join('');
+
+  // Overall avg row
+  const avgs = phones.map(p => {
+    const vals = Object.values(p.scores || {});
+    return vals.length ? Math.round(vals.reduce((a,b) => a+b,0) / vals.length) : 0;
+  });
+  const maxAvg = Math.max(...avgs);
+  const avgCells = avgs.map((a, i) => `<td class="score-cell ${a === maxAvg ? 'best' : ''}" style="border-top:1px solid var(--border)">${a}</td>`).join('');
+
+  return `
+    <div class="winner-banner">
+      <div class="crown">👑</div>
+      <div>
+        <strong>${winnerName}</strong>
+        <p>Wins with the highest balanced score across all 7 dimensions</p>
+      </div>
+    </div>
+    <div class="compare-wrap">
+      <table class="compare-table">
+        <thead><tr><th>Dimension</th>${headerCols}</tr></thead>
+        <tbody>
+          ${rows}
+          <tr><td class="dim-label" style="font-weight:600;border-top:1px solid var(--border)">Overall avg</td>${avgCells}</tr>
+        </tbody>
+      </table>
+    </div>`;
+}
+
+// ── SEARCH ────────────────────────────────────────────────────────────────
+async function doSearch() {
+  const params = new URLSearchParams();
+  const brand = document.getElementById('s-brand').value.trim();
+  const os = document.getElementById('s-os').value;
+  const max = document.getElementById('s-max').value;
+  const min = document.getElementById('s-min').value;
+  const ram = document.getElementById('s-ram').value;
+  const storage = document.getElementById('s-storage').value;
+
+  if (brand) params.set('brand', brand);
+  if (os) params.set('os', os);
+  if (max) params.set('maxPrice', max);
+  if (min) params.set('minPrice', min);
+  if (ram) params.set('minRam', ram);
+  if (storage) params.set('minStorage', storage);
+
+  const container = document.getElementById('search-results');
+  container.innerHTML = `<div class="empty-state"><div class="spinner" style="width:32px;height:32px;border-width:3px;margin:0 auto 12px"></div></div>`;
+
+  try {
+    const data = await get('/phones/search?' + params.toString());
+    const phones = data.phones || data;
+
+    if (!phones.length) {
+      container.innerHTML = `<div class="empty-state"><div class="icon">🔎</div><p>No phones match these filters.</p></div>`;
+      return;
+    }
+
+    container.innerHTML = `
+      <div class="result-meta">${phones.length} phone${phones.length !== 1 ? 's' : ''} found</div>
+      <div class="phone-list">${phones.map(renderPhoneListItem).join('')}</div>`;
+  } catch (e) {
+    container.innerHTML = `<div class="error-state">⚠️ ${e.message}</div>`;
+  }
+}
+
+function renderPhoneListItem(p) {
+  const name = p.name || (p.brand + ' ' + p.model);
+  const os = (p.os || p.operatingSystem || '').toLowerCase();
+  const avg = p.scores ? Math.round(Object.values(p.scores).reduce((a,b)=>a+b,0)/7) : null;
+  return `
+    <div class="phone-list-item" onclick="showDetail('${encodeURIComponent(name)}')">
+      <div class="phone-list-info">
+        <div class="phone-list-name">${name}</div>
+        <div class="phone-list-meta">${p.price || ('$'+(p.priceUsd||''))} · ${p.chipset || ''} · ${p.ram || ''} RAM · ${p.battery || ''}</div>
+      </div>
+      <span class="os-badge ${os}">${p.os || p.operatingSystem}</span>
+      ${avg !== null ? `<span class="score-pill">${avg}/100</span>` : ''}
+    </div>`;
+}
+
+// ── DETAIL MODAL ──────────────────────────────────────────────────────────
+async function showDetail(encodedName) {
+  const name = decodeURIComponent(encodedName);
+  const overlay = document.getElementById('modal-overlay');
+  const body = document.getElementById('modal-body');
+  body.innerHTML = `<div class="empty-state"><div class="spinner" style="width:32px;height:32px;border-width:3px;margin:0 auto"></div></div>`;
+  overlay.classList.add('open');
+
+  try {
+    const data = await post('/phone-details', { phone: name });
+    body.innerHTML = renderModal(data);
+  } catch (e) {
+    body.innerHTML = `<div class="error-state">⚠️ ${e.message}</div>`;
+  }
+}
+
+// Fallback: use /phones/search to get details if /phone-details isn't available
+async function post(path, body) {
+  const res = await fetch(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  // If endpoint doesn't exist, fall back gracefully
+  if (res.status === 404 && path === '/phone-details') {
+    const searchRes = await fetch('/phones/search?model=' + encodeURIComponent(body.phone));
+    if (searchRes.ok) {
+      const data = await searchRes.json();
+      const phones = data.phones || [];
+      if (phones.length) return buildDetailFromSearch(phones[0]);
+    }
+    throw new Error('Phone not found');
+  }
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ message: res.statusText }));
+    throw new Error(err.error || err.message || 'Request failed');
+  }
+  return res.json();
+}
+
+function buildDetailFromSearch(p) {
+  return {
+    name: p.name || (p.brand + ' ' + p.model),
+    brand: p.brand,
+    model: p.model,
+    releaseYear: p.releaseYear,
+    price: p.price || ('$' + p.priceUsd),
+    operatingSystem: p.os || p.operatingSystem,
+    specifications: {
+      chipset: p.chipset,
+      ram: p.ram,
+      storage: p.storage,
+      battery: { capacity: p.battery, charging: p.charging },
+      display: { size: p.display, type: '', refreshRate: '' },
+      waterproofRating: p.waterproof,
+      eSIM: false,
+    },
+    scores: p.scores,
+  };
+}
+
+function renderModal(d) {
+  const specs = d.specifications || {};
+  const scores = d.scores || {};
+  return `
+    <div class="modal-header">
+      <div>
+        <div class="modal-title">${d.name}</div>
+        <div style="font-size:13px;color:var(--muted);margin-top:4px">${d.operatingSystem} · ${d.releaseYear}</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px">
+        <div class="modal-price">${d.price}</div>
+        <button class="modal-close" onclick="closeModal()">×</button>
+      </div>
+    </div>
+
+    <div class="spec-section">
+      <h3>Specifications</h3>
+      ${row('Chipset', specs.chipset)}
+      ${row('RAM', specs.ram)}
+      ${row('Storage', specs.storage)}
+      ${row('Battery', specs.battery?.capacity)}
+      ${row('Charging', specs.battery?.charging)}
+      ${row('Display', specs.display?.size + ' ' + (specs.display?.type||''))}
+      ${row('Refresh Rate', specs.display?.refreshRate)}
+      ${row('Waterproof', specs.waterproofRating || 'None')}
+      ${row('eSIM', specs.eSIM ? 'Yes' : 'No')}
+    </div>
+
+    <div class="spec-section">
+      <h3>Performance Scores</h3>
+      <div class="score-bars" style="margin-top:4px">${renderScoreBars(scores)}</div>
+    </div>`;
+}
+
+function row(key, val) {
+  if (!val) return '';
+  return `<div class="spec-row"><span class="spec-key">${key}</span><span class="spec-val">${val}</span></div>`;
+}
+
+function closeModal(e) {
+  if (e && e.target !== document.getElementById('modal-overlay')) return;
+  document.getElementById('modal-overlay').classList.remove('open');
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') document.getElementById('modal-overlay').classList.remove('open');
+});
+</script>
+</body>
+</html>
